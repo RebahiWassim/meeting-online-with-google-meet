@@ -1,0 +1,16 @@
+POST /api/v1/meetings   # create meetings
+
+PATCH /api/v1/meetings/:id/accept   # accepte meetings
+
+PATCH /api/v1/meetings/:id/reject   # refuse meetings
+
+PATCH /api/v1/meetings/:id/cancel   # annulé
+
+GET /api/v1/meetings/doctor/:doctorId  # list des meetings d'un docteur
+
+GET /api/v1/meetings/patient/:patientId  # list des meetings d'un patient
+
+GET /api/v1/meetings/:id   # les details d'un meeting
+
+GET /api/v1/meetings/health  # health check
+
