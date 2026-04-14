@@ -30,5 +30,5 @@ export interface CreateMeetingPayload {
   description: string;
   startTime: string;
   endTime: string;
-  meetLink: string;
+  meetLink: string;  
 }
