@@ -2,11 +2,16 @@ import { Meeting, CreateMeetingPayload } from '../types/meeting.types';
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
+const getHeaders = () => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${localStorage.getItem('token')}`,
+});
+
 export const meetingApi = {
   create: async (payload: CreateMeetingPayload): Promise<Meeting> => {
     const res = await fetch(`${BASE_URL}/meetings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Erreur création meeting');
@@ -14,44 +19,45 @@ export const meetingApi = {
   },
 
   getDoctorMeetings: async (doctorId: string): Promise<Meeting[]> => {
-    const res = await fetch(`${BASE_URL}/meetings/doctor/${doctorId}`);
+    const res = await fetch(`${BASE_URL}/meetings/doctor/${doctorId}`, {
+      headers: getHeaders(),
+    });
     if (!res.ok) throw new Error('Erreur récupération meetings');
     return res.json();
   },
 
   getPatientMeetings: async (patientId: string): Promise<Meeting[]> => {
-    const res = await fetch(`${BASE_URL}/meetings/patient/${patientId}`);
+    const res = await fetch(`${BASE_URL}/meetings/patient/${patientId}`, {
+      headers: getHeaders(),
+    });
     if (!res.ok) throw new Error('Erreur récupération meetings');
     return res.json();
   },
 
-  accept: async (meetingId: string, patientId: string): Promise<Meeting> => {
+  accept: async (meetingId: string): Promise<Meeting> => {
     const res = await fetch(`${BASE_URL}/meetings/${meetingId}/accept`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ patientId }),
+      headers: getHeaders(),
     });
-    if (!res.ok) throw new Error('Erreur acceptation');
+    if (!res.ok) throw new Error('Erreur acceptation meeting');
     return res.json();
   },
 
-  reject: async (meetingId: string, patientId: string): Promise<Meeting> => {
+  reject: async (meetingId: string): Promise<Meeting> => {
     const res = await fetch(`${BASE_URL}/meetings/${meetingId}/reject`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ patientId }),
+      headers: getHeaders(),
     });
-    if (!res.ok) throw new Error('Erreur refus');
+    if (!res.ok) throw new Error('Erreur refus meeting');
     return res.json();
   },
 
-  cancel: async (meetingId: string, doctorId: string): Promise<Meeting> => {
+  cancel: async (meetingId: string): Promise<Meeting> => {
     const res = await fetch(`${BASE_URL}/meetings/${meetingId}/cancel`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ doctorId }),
+      headers: getHeaders(),
     });
-    if (!res.ok) throw new Error('Erreur annulation');
+    if (!res.ok) throw new Error('Erreur annulation meeting');
     return res.json();
   },
 };
