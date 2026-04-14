@@ -39,7 +39,7 @@ export const meetingApi = {
       method: 'PATCH',
       headers: getHeaders(),
     });
-    if (!res.ok) throw new Error('Erreur acceptation meeting');
+    if (!res.ok) throw new Error('Erreur acceptation');
     return res.json();
   },
 
@@ -48,7 +48,7 @@ export const meetingApi = {
       method: 'PATCH',
       headers: getHeaders(),
     });
-    if (!res.ok) throw new Error('Erreur refus meeting');
+    if (!res.ok) throw new Error('Erreur refus');
     return res.json();
   },
 
@@ -57,7 +57,7 @@ export const meetingApi = {
       method: 'PATCH',
       headers: getHeaders(),
     });
-    if (!res.ok) throw new Error('Erreur annulation meeting');
+    if (!res.ok) throw new Error('Erreur annulation');
     return res.json();
   },
 };

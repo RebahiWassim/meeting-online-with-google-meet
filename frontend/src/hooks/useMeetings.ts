@@ -4,13 +4,14 @@ import { meetingApi } from '../api/meeting.api';
 
 export function useDoctorMeetings(doctorId: string) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetch = useCallback(async () => {
+  const fetchMeetings = useCallback(async () => {
     try {
       setLoading(true);
-      setMeetings(await meetingApi.getDoctorMeetings(doctorId));
+      const data = await meetingApi.getDoctorMeetings(doctorId);
+      setMeetings(data);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -18,25 +19,26 @@ export function useDoctorMeetings(doctorId: string) {
     }
   }, [doctorId]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => { fetchMeetings(); }, [fetchMeetings]);
 
-  const cancel = async (id: string, doctorId: string) => {
-    const updated = await meetingApi.cancel(id, doctorId);
-    setMeetings(prev => prev.map(m => m.id === id ? updated : m));
+  const cancelMeeting = async (meetingId: string) => {
+    const updated = await meetingApi.cancel(meetingId);
+    setMeetings(prev => prev.map(m => m.id === meetingId ? updated : m));
   };
 
-  return { meetings, loading, error, cancel, refetch: fetch };
+  return { meetings, loading, error, cancelMeeting, refetch: fetchMeetings };
 }
 
 export function usePatientMeetings(patientId: string) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetch = useCallback(async () => {
+  const fetchMeetings = useCallback(async () => {
     try {
       setLoading(true);
-      setMeetings(await meetingApi.getPatientMeetings(patientId));
+      const data = await meetingApi.getPatientMeetings(patientId);
+      setMeetings(data);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -44,17 +46,21 @@ export function usePatientMeetings(patientId: string) {
     }
   }, [patientId]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => { fetchMeetings(); }, [fetchMeetings]);
 
-  const accept = async (id: string, patientId: string) => {
-    const updated = await meetingApi.accept(id, patientId);
-    setMeetings(prev => prev.map(m => m.id === id ? updated : m));
+  const acceptMeeting = async (meetingId: string) => {
+    const updated = await meetingApi.accept(meetingId);
+    setMeetings(prev => prev.map(m => m.id === meetingId ? updated : m));
   };
 
-  const reject = async (id: string, patientId: string) => {
-    const updated = await meetingApi.reject(id, patientId);
-    setMeetings(prev => prev.map(m => m.id === id ? updated : m));
+  const rejectMeeting = async (meetingId: string) => {
+    const updated = await meetingApi.reject(meetingId);
+    setMeetings(prev => prev.map(m => m.id === meetingId ? updated : m));
   };
 
-  return { meetings, loading, error, accept, reject, refetch: fetch };
+  return {
+    meetings, loading, error,
+    acceptMeeting, rejectMeeting,
+    refetch: fetchMeetings,
+  };
 }
