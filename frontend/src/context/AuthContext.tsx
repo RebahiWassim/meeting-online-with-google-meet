@@ -3,73 +3,112 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
   ReactNode,
 } from 'react';
+import { TokenStorage, authFetch } from '../auth/tokenManager';
+import { UserProfile } from '../types/reservation.types';
 
-interface User {
-  id: string;
-  email: string;
-  role: 'DOCTOR' | 'PATIENT';
-  firstName: string;
-  lastName: string;
-}
+const AUTH_URL = import.meta.env.VITE_AUTH_URL || 'http://localhost:3000';
+
+// ─── Context types ────────────────────────────────────────────────────────────
 
 interface AuthContextType {
-  user: User | null;
+  user: UserProfile | null;
   token: string | null;
+  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Hydrate from localStorage on mount
   useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    if (savedToken && savedUser) {
+    const savedUser  = TokenStorage.getUser();
+    const savedToken = TokenStorage.getAccess();
+    if (savedUser && savedToken) {
+      setUser(savedUser);
       setToken(savedToken);
-      setUser(JSON.parse(savedUser));
     }
+    setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const res = await fetch(
-      `${import.meta.env.VITE_AUTH_URL}/auth/login`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      }
-    );
+  // ── Login with email/password ─────────────────────────────────────────────
 
-    if (!res.ok) throw new Error('Email ou mot de passe incorrect');
+  const login = async (email: string, password: string) => {
+    const res = await fetch(`${AUTH_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Email ou mot de passe incorrect');
+    }
 
     const data = await res.json();
-    const { accessToken, user: userData } = data;
-
-    localStorage.setItem('token', accessToken);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setToken(accessToken);
-    setUser(userData);
+    // Backend returns: { message, accessToken, refreshToken }
+    // Fetch full profile to get firstName/lastName/role/etc.
+    const profile = await fetchProfile(data.accessToken);
+    TokenStorage.save(data.accessToken, data.refreshToken, profile);
+    setToken(data.accessToken);
+    setUser(profile);
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  // ── Fetch full user profile ───────────────────────────────────────────────
+
+  const fetchProfile = async (accessToken: string): Promise<UserProfile> => {
+    const res = await fetch(`${AUTH_URL}/auth/profile`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error('Impossible de récupérer le profil');
+    return res.json();
+  };
+
+  // ── Refresh profile (e.g. after completing profile) ───────────────────────
+
+  const refreshProfile = useCallback(async () => {
+    try {
+      const res = await authFetch(`${AUTH_URL}/auth/profile`);
+      if (res.ok) {
+        const profile: UserProfile = await res.json();
+        const savedAccess  = TokenStorage.getAccess()!;
+        const savedRefresh = TokenStorage.getRefresh()!;
+        TokenStorage.save(savedAccess, savedRefresh, profile);
+        setUser(profile);
+      }
+    } catch { /* silent */ }
+  }, []);
+
+  // ── Logout ────────────────────────────────────────────────────────────────
+
+  const logout = async () => {
+    try {
+      await authFetch(`${AUTH_URL}/auth/logout`, { method: 'POST' });
+    } catch { /* ignore network errors on logout */ }
+    TokenStorage.clear();
     setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
 }
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useAuth() {
   const ctx = useContext(AuthContext);

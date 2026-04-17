@@ -1,66 +1,146 @@
+// ── useMeetings ───────────────────────────────────────────────────────────────
+// Hook unifié pour gérer :
+//  - les réservations du médecin ou du patient (selon le rôle)
+//  - les créneaux disponibles d'un médecin
+//  - la création et l'annulation de réservations
+//  - la création de créneaux (médecin uniquement)
+
 import { useState, useEffect, useCallback } from 'react';
-import { Meeting } from '../types/meeting.types';
-import { meetingApi } from '../api/meeting.api';
+import { useAuth } from '../context/AuthContext';
+import { reservationApi, scheduleApi } from '../api/reservation.api';
+import {
+  Reservation,
+  Schedule,
+  CreateReservationPayload,
+  CreateSchedulePayload,
+} from '../types/reservation.types';
 
-export function useDoctorMeetings(doctorId: string) {
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// ─── Types de retour ──────────────────────────────────────────────────────────
 
-  const fetchMeetings = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await meetingApi.getDoctorMeetings(doctorId);
-      setMeetings(data);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [doctorId]);
+interface UseMeetingsReturn {
+  // Données
+  reservations: Reservation[];
+  schedules: Schedule[];
+  loading: boolean;
+  error: string | null;
 
-  useEffect(() => { fetchMeetings(); }, [fetchMeetings]);
+  // Actions communes
+  refresh: () => Promise<void>;
 
-  const cancelMeeting = async (meetingId: string) => {
-    const updated = await meetingApi.cancel(meetingId);
-    setMeetings(prev => prev.map(m => m.id === meetingId ? updated : m));
-  };
+  // Actions patient
+  bookReservation: (payload: CreateReservationPayload) => Promise<void>;
+  cancelReservation: (reservationId: string) => Promise<void>;
+  fetchAvailableSlots: (doctorId: string) => Promise<Schedule[]>;
 
-  return { meetings, loading, error, cancelMeeting, refetch: fetchMeetings };
+  // Actions médecin
+  createSchedule: (payload: CreateSchedulePayload) => Promise<void>;
 }
 
-export function usePatientMeetings(patientId: string) {
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [loading, setLoading] = useState(true);
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useMeetings(): UseMeetingsReturn {
+  const { user } = useAuth();
+
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMeetings = useCallback(async () => {
+  // ── Charger les réservations selon le rôle ────────────────────────────────
+
+  const loadReservations = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const data = await meetingApi.getPatientMeetings(patientId);
-      setMeetings(data);
-    } catch (e: any) {
-      setError(e.message);
+      let data: Reservation[];
+      if (user.role === 'DOCTOR') {
+        data = await reservationApi.getByDoctor(user.id);
+      } else {
+        data = await reservationApi.getByPatient(user.id);
+      }
+      setReservations(data);
+
+      // Si médecin, charger aussi ses créneaux
+      if (user.role === 'DOCTOR') {
+        const slots = await scheduleApi.getAvailable(user.id);
+        setSchedules(slots);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du chargement');
     } finally {
       setLoading(false);
     }
-  }, [patientId]);
+  }, [user]);
 
-  useEffect(() => { fetchMeetings(); }, [fetchMeetings]);
+  // Chargement initial
+  useEffect(() => {
+    loadReservations();
+  }, [loadReservations]);
 
-  const acceptMeeting = async (meetingId: string) => {
-    const updated = await meetingApi.accept(meetingId);
-    setMeetings(prev => prev.map(m => m.id === meetingId ? updated : m));
-  };
+  // ── Patient : réserver un créneau ─────────────────────────────────────────
 
-  const rejectMeeting = async (meetingId: string) => {
-    const updated = await meetingApi.reject(meetingId);
-    setMeetings(prev => prev.map(m => m.id === meetingId ? updated : m));
-  };
+  const bookReservation = useCallback(
+    async (payload: CreateReservationPayload) => {
+      setError(null);
+      try {
+        const newReservation = await reservationApi.create(payload);
+        setReservations(prev => [...prev, newReservation]);
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      }
+    },
+    []
+  );
+
+  // ── Annuler une réservation ───────────────────────────────────────────────
+
+  const cancelReservation = useCallback(async (reservationId: string) => {
+    setError(null);
+    try {
+      await reservationApi.cancel(reservationId);
+      setReservations(prev => prev.filter(r => r.id !== reservationId));
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  }, []);
+
+  // ── Patient : récupérer les créneaux disponibles d'un médecin ─────────────
+
+  const fetchAvailableSlots = useCallback(async (doctorId: string): Promise<Schedule[]> => {
+    try {
+      const slots = await scheduleApi.getAvailable(doctorId);
+      return slots;
+    } catch (err: any) {
+      setError(err.message);
+      return [];
+    }
+  }, []);
+
+  // ── Médecin : créer un créneau ────────────────────────────────────────────
+
+  const createSchedule = useCallback(async (payload: CreateSchedulePayload) => {
+    setError(null);
+    try {
+      const newSchedule = await scheduleApi.create(payload);
+      setSchedules(prev => [...prev, newSchedule]);
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  }, []);
 
   return {
-    meetings, loading, error,
-    acceptMeeting, rejectMeeting,
-    refetch: fetchMeetings,
+    reservations,
+    schedules,
+    loading,
+    error,
+    refresh: loadReservations,
+    bookReservation,
+    cancelReservation,
+    fetchAvailableSlots,
+    createSchedule,
   };
 }
