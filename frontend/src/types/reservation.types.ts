@@ -35,6 +35,7 @@ export interface Reservation {
   reason: string;
   reservationStatus: boolean;
   schedule: Schedule;
+  meetLink?: string;
 }
 
 // ── Auth payloads ─────────────────────────────────────────────────────────────

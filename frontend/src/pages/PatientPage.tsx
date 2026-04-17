@@ -15,6 +15,8 @@ export default function PatientPage() {
   const { user, logout } = useAuth();
   const { reservations, loading, error, refresh, cancelReservation } = useMeetings();
 
+  console.log("RESERVATIONS:", reservations);
+
   const [activeTab, setActiveTab] = useState<'reservations' | 'new'>('reservations');
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -37,8 +39,7 @@ export default function PatientPage() {
   // ── Filtrer les réservations ONLINE actives ───────────────────────────────
 
   const activeReservations = reservations.filter(
-    (r: Reservation) =>
-      r.reservationStatus && r.schedule?.appointmenttype === TYPE.ONLINE
+    (r) => r.reservationStatus === true
   );
 
   const pastReservations = reservations.filter(

@@ -114,16 +114,15 @@ export default function ReservationCard({
           </button>
         )}
 
-        {schedule.appointmenttype === TYPE.ONLINE && reservationStatus && (
-          <button
-            onClick={() => {
-              // Logique pour rejoindre la visio
-              console.log('Rejoindre la consultation en ligne');
-            }}
+        {reservation.meetLink && schedule.appointmenttype === TYPE.ONLINE && reservationStatus && (
+          <a
+            href={reservation.meetLink}
+            target="_blank"
+            rel="noopener noreferrer"
             className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-700 flex items-center gap-1"
           >
             🎥 Rejoindre la consultation
-          </button>
+          </a>
         )}
       </div>
     </div>
