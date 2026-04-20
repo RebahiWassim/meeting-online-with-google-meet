@@ -45,17 +45,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ── Login with email/password ─────────────────────────────────────────────
 
   const login = async (email: string, password: string) => {
-    const res = await fetch('https://authservice-version-90.onrender.com/auth/login', {
+    fetch('https://authservice-version-90.onrender.com/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         email: 'Sara.Mansouri@test.com', 
-        password: '123456789' 
+        password: 'password123' 
       })
     })
-    .then(res => res.json())
-    .then(data => console.log('Réponse:', data))
-    .catch(err => console.error('Erreur:', err));
+    .then(res => {
+      console.log('Status:', res.status);
+      console.log('Headers:', [...res.headers]);
+      return res.json();
+    })
+    .then(data => console.log('Data:', data))
+    .catch(err => console.error('Error:', err));
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.message || 'Email ou mot de passe incorrect');
