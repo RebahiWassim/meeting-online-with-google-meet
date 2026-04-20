@@ -2,7 +2,7 @@
 // Stores accessToken + refreshToken + user profile in localStorage.
 // Provides a fetch wrapper that auto-refreshes the access token on 401.
 
-const AUTH_URL = import.meta.env.VITE_AUTHSERV_URL || 'http://localhost:3000';
+const AUTH_URL = import.meta.env.VITE_AUTH_URL || 'http://localhost:3000';
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
