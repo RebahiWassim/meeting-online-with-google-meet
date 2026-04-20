@@ -1,26 +1,16 @@
-// ── DoctorPage ────────────────────────────────────────────────────────────────
-// Dashboard du médecin :
-//  - Voir ses consultations en ligne réservées par des patients
-//  - Créer/gérer ses créneaux de disponibilité
-//  - Rejoindre une consultation Google Meet
-
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useMeetings } from '../hooks/useMeetings';
-import {
-  DAY,
-  TYPE,
-  CreateSchedulePayload,
-  Reservation,
-} from '../types/reservation.types';
+import { DAY, TYPE, CreateSchedulePayload, Reservation } from '../types/reservation.types';
+import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
 
 export default function DoctorPage() {
   const { user, logout } = useAuth();
-  const { reservations, schedules, loading, error, refresh, createSchedule } =
-    useMeetings();
+  const { reservations, schedules, loading, error, refresh, createSchedule } = useMeetings();
 
-  const [activeTab, setActiveTab] = useState<'reservations' | 'schedule'>('reservations');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'appointments'>('schedule');
   const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [scheduleForm, setScheduleForm] = useState<CreateSchedulePayload>({
     doctorId: user?.id || '',
     dayOfWeek: DAY.MONDAY,
@@ -30,353 +20,326 @@ export default function DoctorPage() {
   });
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [formSuccess, setFormSuccess] = useState(false);
-
-  // ── Créer un créneau ──────────────────────────────────────────────────────
 
   const handleCreateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    setFormSuccess(false);
     setCreating(true);
     try {
       await createSchedule({ ...scheduleForm, doctorId: user!.id });
-      setFormSuccess(true);
       setShowScheduleForm(false);
       refresh();
+      setScheduleForm({
+        doctorId: user?.id || '',
+        dayOfWeek: DAY.MONDAY,
+        startTime: '09:00',
+        endTime: '10:00',
+        appointmenttype: TYPE.ONLINE,
+      });
     } catch (err: any) {
-      setFormError(err.message || 'Erreur lors de la création du créneau.');
+      setFormError(err.message || 'Error creating schedule');
     } finally {
       setCreating(false);
     }
   };
 
-  // ── Réservations ONLINE uniquement ────────────────────────────────────────
-  const onlineReservations = reservations.filter(
-    (r: Reservation) => r.schedule?.appointmenttype === TYPE.ONLINE
-  );
+  const onlineReservations = reservations.filter((r: Reservation) => r.reservationStatus === true);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ── Header ── */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🏥</span>
-            <div>
-              <h1 className="text-gray-900 font-semibold text-sm">
-                Dr. {user?.firstName} {user?.lastName}
-              </h1>
-              <p className="text-gray-400 text-xs">
-                {user?.doctor?.speciality} · {user?.doctor?.establishment}
-              </p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Sidebar */}
+      <div className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 p-6 flex flex-col">
+        <div className="mb-12">
+          <div className="flex items-center gap-3 mb-8">
+            <span className="text-2xl">⭐</span>
+            <span className="text-lg font-semibold text-gray-900">platformName</span>
           </div>
+
+          <nav className="space-y-2">
+            {[
+              { label: 'Overview', icon: '📊' },
+              { label: 'Appointments', icon: '📅' },
+              { label: 'Analytics', icon: '📈' },
+              { label: 'Schedule', icon: '🗓️', active: true },
+              { label: 'Consultation', icon: '💬' },
+            ].map((item) => (
+              <button
+                key={item.label}
+                className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors ${
+                  item.active
+                    ? 'bg-blue-50 text-blue-600 font-medium'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <span className="mr-3">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="mt-auto pt-6 border-t border-gray-200 flex flex-col gap-3">
           <button
             onClick={logout}
-            className="text-gray-500 hover:text-red-600 text-sm px-3 py-1.5 border border-gray-200 rounded-lg hover:border-red-200 transition-colors"
+            className="text-left px-4 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           >
-            Déconnexion
+            Logout
           </button>
+          <div className="px-4 py-3 bg-gray-50 rounded-lg">
+            <p className="text-xs text-gray-500">Logged in as</p>
+            <p className="text-sm font-medium text-gray-900">Dr. {user?.lastName}</p>
+          </div>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        {/* ── Tabs ── */}
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
-          <button
-            onClick={() => setActiveTab('reservations')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'reservations'
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Consultations ({onlineReservations.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('schedule')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'schedule'
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Mes créneaux ({schedules.length})
-          </button>
-        </div>
-
-        {/* ── Erreur globale ── */}
-        {error && (
-          <div className="bg-red-50 text-red-600 border border-red-200 rounded-lg p-3 mb-4 text-sm">
-            {error}
-            <button onClick={refresh} className="ml-2 underline">
-              Réessayer
+      {/* Main Content */}
+      <div className="ml-64">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+          <div className="px-8 py-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">My Schedule</h1>
+              <p className="text-sm text-gray-500 mt-1">Manage your appointments and availability</p>
+            </div>
+            <button
+              onClick={() => setShowScheduleForm(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Set Availability
             </button>
           </div>
-        )}
+        </header>
 
-        {/* ── Tab : Réservations ── */}
-        {activeTab === 'reservations' && (
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-gray-800 font-semibold">
-                Consultations en ligne
-              </h2>
-              <button
-                onClick={refresh}
-                disabled={loading}
-                className="text-blue-600 text-sm hover:underline disabled:opacity-50"
-              >
-                {loading ? 'Actualisation…' : '↻ Actualiser'}
-              </button>
+        <main className="p-8">
+          <div className="grid grid-cols-4 gap-8">
+            {/* Left: Calendar */}
+            <div className="col-span-1">
+              <div className="bg-white rounded-2xl border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="font-semibold text-gray-900">April 2025</h3>
+                  <div className="flex gap-2">
+                    <button className="p-1 hover:bg-gray-100 rounded">
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button className="p-1 hover:bg-gray-100 rounded">
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="grid grid-cols-7 gap-2 text-center mb-4">
+                    {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((day) => (
+                      <div key={day} className="text-xs font-medium text-gray-500">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    {Array.from({ length: 30 }).map((_, i) => (
+                      <button
+                        key={i}
+                        className={`py-2 rounded-lg text-sm font-medium transition-colors ${
+                          i === 19
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" defaultChecked className="rounded" />
+                    <span className="text-gray-700">Repeat Weekly Until Changed</span>
+                  </label>
+                </div>
+
+                <button className="w-full mt-6 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+                  Save Availability
+                </button>
+              </div>
             </div>
 
-            {loading ? (
-              <div className="text-center py-12 text-gray-400 text-sm">
-                Chargement des consultations…
-              </div>
-            ) : onlineReservations.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-                <p className="text-4xl mb-3">📅</p>
-                <p className="text-gray-500 text-sm">
-                  Aucune consultation en ligne pour le moment.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {onlineReservations.map((r: Reservation) => (
-                  <ReservationCard key={r.id} reservation={r} />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+            {/* Right: Time Schedule */}
+            <div className="col-span-3">
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                {/* Header: Days of week */}
+                <div className="grid grid-cols-7 border-b border-gray-200">
+                  {[
+                    { day: 'Monday', date: 'Apr 20', hours: '3 available' },
+                    { day: 'Tuesday', date: 'Apr 21', hours: '0 available' },
+                    { day: 'Wednesday', date: 'Apr 22', hours: '1 available' },
+                    { day: 'Thursday', date: 'Apr 23', hours: '2 available' },
+                    { day: 'Friday', date: 'Apr 24', hours: '4 available' },
+                    { day: 'Saturday', date: 'Apr 25', hours: '0 available' },
+                    { day: 'Sunday', date: 'Apr 26', hours: '0 available' },
+                  ].map((item) => (
+                    <div
+                      key={item.day}
+                      className="p-4 border-r border-gray-200 last:border-r-0 flex flex-col items-start"
+                    >
+                      <label className="flex items-center gap-2 mb-3 w-full">
+                        <input type="checkbox" defaultChecked className="rounded" />
+                        <span className="text-sm font-medium text-gray-900">{item.day}</span>
+                      </label>
+                      <p className="text-xs text-gray-500">{item.date}</p>
+                      <p className="text-xs text-gray-400 mt-1">{item.hours}</p>
+                    </div>
+                  ))}
+                </div>
 
-        {/* ── Tab : Créneaux ── */}
-        {activeTab === 'schedule' && (
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-gray-800 font-semibold">Mes créneaux</h2>
-              <button
-                onClick={() => {
-                  setShowScheduleForm(v => !v);
-                  setFormError(null);
-                  setFormSuccess(false);
-                }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
-              >
-                + Nouveau créneau
-              </button>
+                {/* Time slots */}
+                <div className="p-6">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-4">
+                      Start Time
+                    </p>
+                    {['08:00', '09:00', '10:00', '12:00', '14:00', '15:00', '16:00', '17:00'].map((time) => (
+                      <div
+                        key={time}
+                        className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors"
+                      >
+                        <span className="text-sm text-gray-600">{time}</span>
+                        <div className="flex gap-1">
+                          <button className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-blue-600">
+                            ✎
+                          </button>
+                          <button className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-red-600">
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button className="w-full mt-6 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center justify-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    Add Time Slot
+                  </button>
+                </div>
+
+                {/* Mark Unavailable Dates */}
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                  <p className="text-xs text-gray-600 font-medium mb-3">Mark Unavailable Dates</p>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
             </div>
+          </div>
 
-            {/* Formulaire création */}
-            {showScheduleForm && (
-              <form
-                onSubmit={handleCreateSchedule}
-                className="bg-white border border-gray-200 rounded-xl p-6 mb-6 space-y-4"
-              >
-                <h3 className="text-gray-800 font-medium text-sm">
-                  Ajouter un créneau en ligne
-                </h3>
+          {/* Schedule Form Modal */}
+          {showScheduleForm && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl p-8 max-w-md w-full">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900">Add Time Slot</h2>
+                  <button
+                    onClick={() => setShowScheduleForm(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
 
                 {formError && (
-                  <p className="text-red-600 text-sm bg-red-50 p-2 rounded-lg">
+                  <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4">
                     {formError}
-                  </p>
+                  </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3">
+                <form onSubmit={handleCreateSchedule} className="space-y-4">
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">Jour</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Day of Week</label>
                     <select
                       value={scheduleForm.dayOfWeek}
-                      onChange={e =>
-                        setScheduleForm(f => ({
+                      onChange={(e) =>
+                        setScheduleForm((f) => ({
                           ...f,
                           dayOfWeek: e.target.value as DAY,
                         }))
                       }
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      {Object.values(DAY).map(d => (
+                      {Object.values(DAY).map((d) => (
                         <option key={d} value={d}>
-                          {d.charAt(0) + d.slice(1).toLowerCase()}
+                          {d}
                         </option>
                       ))}
                     </select>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Start Time</label>
+                      <input
+                        type="time"
+                        value={scheduleForm.startTime}
+                        onChange={(e) =>
+                          setScheduleForm((f) => ({ ...f, startTime: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">End Time</label>
+                      <input
+                        type="time"
+                        value={scheduleForm.endTime}
+                        onChange={(e) =>
+                          setScheduleForm((f) => ({ ...f, endTime: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">Type</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
                     <select
                       value={scheduleForm.appointmenttype}
-                      onChange={e =>
-                        setScheduleForm(f => ({
+                      onChange={(e) =>
+                        setScheduleForm((f) => ({
                           ...f,
                           appointmenttype: e.target.value as TYPE,
                         }))
                       }
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value={TYPE.ONLINE}>En ligne</option>
-                      <option value={TYPE.ATTENDANCE}>Présentiel</option>
+                      <option value={TYPE.ONLINE}>Online</option>
+                      <option value={TYPE.ATTENDANCE}>In-person</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Heure de début
-                    </label>
-                    <input
-                      type="time"
-                      value={scheduleForm.startTime}
-                      onChange={e =>
-                        setScheduleForm(f => ({ ...f, startTime: e.target.value }))
-                      }
-                      required
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="submit"
+                      disabled={creating}
+                      className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+                    >
+                      {creating ? 'Creating...' : 'Add Slot'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowScheduleForm(false)}
+                      className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Heure de fin
-                    </label>
-                    <input
-                      type="time"
-                      value={scheduleForm.endTime}
-                      onChange={e =>
-                        setScheduleForm(f => ({ ...f, endTime: e.target.value }))
-                      }
-                      required
-                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="submit"
-                    disabled={creating}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {creating ? 'Enregistrement…' : 'Créer le créneau'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowScheduleForm(false)}
-                    className="text-gray-500 px-4 py-2 text-sm hover:underline"
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {formSuccess && (
-              <div className="bg-green-50 text-green-700 border border-green-200 rounded-lg p-3 mb-4 text-sm">
-                Créneau créé avec succès.
+                </form>
               </div>
-            )}
-
-            {/* Liste des créneaux */}
-            {loading ? (
-              <div className="text-center py-12 text-gray-400 text-sm">
-                Chargement…
-              </div>
-            ) : schedules.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-                <p className="text-4xl mb-3">🗓</p>
-                <p className="text-gray-500 text-sm">
-                  Vous n'avez pas encore de créneaux.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {schedules.map(s => (
-                  <div
-                    key={s.id}
-                    className={`bg-white border rounded-xl p-4 ${
-                      s.status ? 'border-green-200' : 'border-gray-200 opacity-60'
-                    }`}
-                  >
-                    <p className="font-medium text-gray-800 text-sm capitalize">
-                      {s.dayOfWeek.toLowerCase()}
-                    </p>
-                    <p className="text-gray-500 text-xs mt-1">
-                      {s.startTime} – {s.endTime}
-                    </p>
-                    <div className="flex gap-1 mt-2">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          s.appointmenttype === TYPE.ONLINE
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {s.appointmenttype === TYPE.ONLINE ? 'En ligne' : 'Présentiel'}
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          s.status
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {s.status ? 'Disponible' : 'Indisponible'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-      </main>
-    </div>
-  );
-}
-
-// ── Carte réservation ─────────────────────────────────────────────────────────
-
-function ReservationCard({ reservation: r }: { reservation: Reservation }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-start justify-between gap-4">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-            En ligne
-          </span>
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full ${
-              r.reservationStatus
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-500'
-            }`}
-          >
-            {r.reservationStatus ? 'Confirmée' : 'Annulée'}
-          </span>
-        </div>
-        <p className="text-gray-800 text-sm font-medium truncate">
-          Patient : {r.patientId}
-        </p>
-        <p className="text-gray-500 text-xs mt-0.5 truncate">
-          Motif : {r.reason}
-        </p>
-        {r.schedule && (
-          <p className="text-gray-400 text-xs mt-0.5 capitalize">
-            {r.schedule.dayOfWeek.toLowerCase()} · {r.schedule.startTime} –{' '}
-            {r.schedule.endTime}
-          </p>
-        )}
+            </div>
+          )}
+        </main>
       </div>
-
-      {/* Bouton rejoindre la réunion Google Meet — le lien est géré par le backend */}
-      <a
-        href="#"
-        className="shrink-0 bg-green-600 text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-green-700 whitespace-nowrap"
-        title="Rejoindre via Google Meet"
-      >
-        Rejoindre
-      </a>
     </div>
   );
 }

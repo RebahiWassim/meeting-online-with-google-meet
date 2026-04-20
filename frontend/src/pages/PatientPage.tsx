@@ -1,275 +1,289 @@
-// ── PatientPage ───────────────────────────────────────────────────────────────
-// Dashboard du patient :
-//  - Voir ses réservations actives
-//  - Réserver une nouvelle consultation en ligne
-//  - Annuler une réservation
-//  - Rejoindre une consultation Google Meet
-
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useMeetings } from '../hooks/useMeetings';
-import CreateMeetingForm from '../components/CreateMeetingForm';
-import { TYPE, Reservation } from '../types/reservation.types';
+import { Reservation } from '../types/reservation.types';
+import { ChevronDown, Search, Plus } from 'lucide-react';
 
 export default function PatientPage() {
   const { user, logout } = useAuth();
-  const { reservations, loading, error, refresh, cancelReservation } = useMeetings();
+  const { reservations, loading, error, refresh } = useMeetings();
 
-  console.log("RESERVATIONS:", reservations);
+  const [activeTab, setActiveTab] = useState<'appointments' | 'doctors'>('appointments');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
-  const [activeTab, setActiveTab] = useState<'reservations' | 'new'>('reservations');
-  const [cancelling, setCancelling] = useState<string | null>(null);
-  const [cancelError, setCancelError] = useState<string | null>(null);
+  const activeReservations = reservations.filter((r : Reservation) => r.reservationStatus === true);
 
-  // ── Annuler une réservation ───────────────────────────────────────────────
+  const mockDoctors = [
+    { id: '1', name: 'Dehmani Mohamed', specialty: 'Cardiologie', avatar: '👨‍⚕️' },
+    { id: '2', name: 'Dr. Sarah Johnson', specialty: 'Neurologie', avatar: '👩‍⚕️' },
+    { id: '3', name: 'Dr. Ahmed Hassan', specialty: 'Dermatologie', avatar: '👨‍⚕️' },
+    { id: '4', name: 'Dr. Layla Mansour', specialty: 'Ophthalmologie', avatar: '👩‍⚕️' },
+    { id: '5', name: 'Dr. Ibrahim Ali', specialty: 'Orthopédie', avatar: '👨‍⚕️' },
+  ];
 
-  const handleCancel = async (reservationId: string) => {
-    if (!confirm('Voulez-vous vraiment annuler cette consultation ?')) return;
-    setCancelError(null);
-    setCancelling(reservationId);
-    try {
-      await cancelReservation(reservationId);
-    } catch (err: any) {
-      setCancelError(err.message || 'Erreur lors de l\'annulation.');
-    } finally {
-      setCancelling(null);
-    }
-  };
-
-  // ── Filtrer les réservations ONLINE actives ───────────────────────────────
-
-  const activeReservations = reservations.filter(
-    (r) => r.reservationStatus === true
+  const filteredDoctors = mockDoctors.filter((doc : { name: string }) =>
+    doc.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const pastReservations = reservations.filter(
-    (r: Reservation) => !r.reservationStatus
+  const paginatedDoctors = filteredDoctors.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
+
+  const totalPages = Math.ceil(filteredDoctors.length / itemsPerPage);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ── Header ── */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🏥</span>
-            <div>
-              <h1 className="text-gray-900 font-semibold text-sm">
-                {user?.firstName} {user?.lastName}
-              </h1>
-              <p className="text-gray-400 text-xs">Espace patient</p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Sidebar Navigation */}
+      <div className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 p-6 flex flex-col">
+        <div className="mb-12">
+          <div className="flex items-center gap-3 mb-8">
+            <span className="text-2xl">⭐</span>
+            <span className="text-lg font-semibold text-gray-900">platformName</span>
           </div>
+
+          <nav className="space-y-2">
+            {[
+              { label: 'Overview', icon: '📊' },
+              { label: 'Appointments', icon: '📅', active: true },
+              { label: 'Analysis', icon: '📈' },
+              { label: 'Schedule', icon: '🗓️' },
+              { label: 'Consultation', icon: '💬' },
+            ].map((item) => (
+              <button
+                key={item.label}
+                className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors ${
+                  item.active
+                    ? 'bg-blue-50 text-blue-600 font-medium'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <span className="mr-3">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="mt-auto pt-6 border-t border-gray-200 flex flex-col gap-3">
           <button
             onClick={logout}
-            className="text-gray-500 hover:text-red-600 text-sm px-3 py-1.5 border border-gray-200 rounded-lg hover:border-red-200 transition-colors"
+            className="text-left px-4 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           >
-            Déconnexion
+            Logout
           </button>
-        </div>
-      </header>
-
-      <main className="max-w-3xl mx-auto px-6 py-8">
-        {/* ── Stats rapides ── */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-xs text-gray-400 mb-1">Consultations actives</p>
-            <p className="text-2xl font-semibold text-blue-600">
-              {activeReservations.length}
-            </p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-xs text-gray-400 mb-1">Total consultations</p>
-            <p className="text-2xl font-semibold text-gray-700">
-              {reservations.length}
+          <div className="px-4 py-3 bg-gray-50 rounded-lg">
+            <p className="text-xs text-gray-500">Logged in as</p>
+            <p className="text-sm font-medium text-gray-900">
+              {user?.firstName} {user?.lastName}
             </p>
           </div>
         </div>
-
-        {/* ── Tabs ── */}
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
-          <button
-            onClick={() => setActiveTab('reservations')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'reservations'
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Mes consultations
-          </button>
-          <button
-            onClick={() => setActiveTab('new')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'new'
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            + Nouvelle réservation
-          </button>
-        </div>
-
-        {/* ── Erreurs ── */}
-        {(error || cancelError) && (
-          <div className="bg-red-50 text-red-600 border border-red-200 rounded-lg p-3 mb-4 text-sm">
-            {error || cancelError}
-            {error && (
-              <button onClick={refresh} className="ml-2 underline">
-                Réessayer
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* ── Tab : Mes consultations ── */}
-        {activeTab === 'reservations' && (
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-gray-800 font-semibold">Mes consultations</h2>
-              <button
-                onClick={refresh}
-                disabled={loading}
-                className="text-blue-600 text-sm hover:underline disabled:opacity-50"
-              >
-                {loading ? 'Actualisation…' : '↻ Actualiser'}
-              </button>
-            </div>
-
-            {loading ? (
-              <div className="text-center py-12 text-gray-400 text-sm">
-                Chargement…
-              </div>
-            ) : activeReservations.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-                <p className="text-4xl mb-3">📋</p>
-                <p className="text-gray-500 text-sm mb-3">
-                  Aucune consultation active.
-                </p>
-                <button
-                  onClick={() => setActiveTab('new')}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
-                >
-                  Réserver une consultation
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3 mb-6">
-                  {activeReservations.map((r: Reservation) => (
-                    <PatientReservationCard
-                      key={r.id}
-                      reservation={r}
-                      cancelling={cancelling === r.id}
-                      onCancel={() => handleCancel(r.id)}
-                    />
-                  ))}
-                </div>
-
-                {/* Consultations passées / annulées */}
-                {pastReservations.length > 0 && (
-                  <>
-                    <h3 className="text-gray-500 text-xs font-medium mb-2 uppercase tracking-wide">
-                      Historique
-                    </h3>
-                    <div className="space-y-2">
-                      {pastReservations.map((r: Reservation) => (
-                        <PatientReservationCard
-                          key={r.id}
-                          reservation={r}
-                          cancelling={false}
-                          onCancel={() => {}}
-                          past
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-          </section>
-        )}
-
-        {/* ── Tab : Nouvelle réservation ── */}
-        {activeTab === 'new' && (
-          <CreateMeetingForm
-            onSuccess={() => {
-              refresh();
-              setActiveTab('reservations');
-            }}
-          />
-        )}
-      </main>
-    </div>
-  );
-}
-
-// ── Carte réservation patient ─────────────────────────────────────────────────
-
-function PatientReservationCard({
-  reservation: r,
-  cancelling,
-  onCancel,
-  past = false,
-}: {
-  reservation: Reservation;
-  cancelling: boolean;
-  onCancel: () => void;
-  past?: boolean;
-}) {
-  return (
-    <div
-      className={`bg-white border rounded-xl p-4 flex items-start justify-between gap-4 ${
-        past ? 'border-gray-100 opacity-70' : 'border-gray-200'
-      }`}
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-            En ligne
-          </span>
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full ${
-              r.reservationStatus
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-500'
-            }`}
-          >
-            {r.reservationStatus ? 'Confirmée' : 'Annulée'}
-          </span>
-        </div>
-        <p className="text-gray-800 text-sm font-medium truncate">
-          Médecin : {r.doctorId}
-        </p>
-        <p className="text-gray-500 text-xs mt-0.5 truncate">
-          Motif : {r.reason}
-        </p>
-        {r.schedule && (
-          <p className="text-gray-400 text-xs mt-0.5 capitalize">
-            {r.schedule.dayOfWeek.toLowerCase()} · {r.schedule.startTime} –{' '}
-            {r.schedule.endTime}
-          </p>
-        )}
       </div>
 
-      {!past && r.reservationStatus && (
-        <div className="flex flex-col gap-2 shrink-0">
-          <a
-            href="#"
-            className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-700 text-center whitespace-nowrap"
-            title="Rejoindre via Google Meet"
-          >
-            Rejoindre
-          </a>
-          <button
-            onClick={onCancel}
-            disabled={cancelling}
-            className="border border-red-200 text-red-600 px-3 py-1.5 rounded-lg text-xs hover:bg-red-50 disabled:opacity-50 whitespace-nowrap"
-          >
-            {cancelling ? '…' : 'Annuler'}
-          </button>
-        </div>
-      )}
+      {/* Main Content */}
+      <div className="ml-64">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+          <div className="px-8 py-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+              <p className="text-sm text-gray-500 mt-1">
+                {activeTab === 'appointments' ? 'Manage your appointments and availability' : 'Find and book appointments'}
+              </p>
+            </div>
+            <button className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors">
+              🔔
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="px-8 border-t border-gray-200">
+            <div className="flex gap-6">
+              <button
+                onClick={() => setActiveTab('appointments')}
+                className={`py-4 px-2 border-b-2 text-sm font-medium transition-colors ${
+                  activeTab === 'appointments'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                My Appointments ({activeReservations.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('doctors')}
+                className={`py-4 px-2 border-b-2 text-sm font-medium transition-colors ${
+                  activeTab === 'doctors'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Available Doctors
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Content */}
+        <main className="p-8">
+          {/* Appointments Tab */}
+          {activeTab === 'appointments' && (
+            <div>
+              {loading ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Loading appointments...</p>
+                </div>
+              ) : activeReservations.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+                  <p className="text-5xl mb-4">📋</p>
+                  <p className="text-gray-500 mb-6">No active appointments yet</p>
+                  <button
+                    onClick={() => setActiveTab('doctors')}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium"
+                  >
+                    Browse Doctors
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {activeReservations.map((r) => (
+                    <div key={r.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                              Active
+                            </span>
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                              Online
+                            </span>
+                          </div>
+                          <p className="text-gray-900 font-semibold">{r.reason}</p>
+                          <p className="text-sm text-gray-500 mt-2">
+                            {r.schedule?.dayOfWeek} • {r.schedule?.startTime} - {r.schedule?.endTime}
+                          </p>
+                        </div>
+                        {r.meetingUrl && (
+                          <a
+                            href={r.meetingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                          >
+                            Join Meeting
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Doctors Tab */}
+          {activeTab === 'doctors' && (
+            <div>
+              <div className="mb-6 flex gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Search doctors by name"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <button className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm">
+                  Filter
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Doctor</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Specialty</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Appointment Type</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {paginatedDoctors.map((doctor) => (
+                        <tr key={doctor.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-lg">
+                                {doctor.avatar}
+                              </div>
+                              <span className="font-medium text-gray-900">{doctor.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm text-gray-600">{doctor.specialty}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex gap-2">
+                              <span className="inline-flex items-center gap-1 text-sm text-gray-600">
+                                🏥 In-person
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-sm text-gray-600">
+                                📹 Video
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <button
+                              onClick={() => setActiveTab('appointments')}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-blue-50 text-blue-600 transition-colors"
+                              title="Add Appointment"
+                            >
+                              <Plus className="w-5 h-5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between text-sm">
+                  <button className="text-gray-600 hover:text-gray-900">← Previous</button>
+                  <div className="flex gap-1">
+                    {Array.from({ length: totalPages }).map((_, i) => (
+                      <button
+                        key={i + 1}
+                        onClick={() => setCurrentPage(i + 1)}
+                        className={`w-8 h-8 rounded-lg transition-colors ${
+                          currentPage === i + 1
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                  <button className="text-gray-600 hover:text-gray-900">Next →</button>
+                  <span className="text-gray-500 ml-auto">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
