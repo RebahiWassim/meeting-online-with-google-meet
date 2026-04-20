@@ -45,20 +45,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ── Login with email/password ─────────────────────────────────────────────
 
   const login = async (email: string, password: string) => {
-    const res = await fetch(`${AUTH_URL}/auth/login`, {
+    const res = await fetch('https://authservice-version-90.onrender.com/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-
+      body: JSON.stringify({ 
+        email: 'Sara.Mansouri@test.com', 
+        password: '123456789' 
+      })
+    })
+    .then(res => res.json())
+    .then(data => console.log('Réponse:', data))
+    .catch(err => console.error('Erreur:', err));
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.message || 'Email ou mot de passe incorrect');
     }
 
     const data = await res.json();
-    // Backend returns: { message, accessToken, refreshToken }
-    // Fetch full profile to get firstName/lastName/role/etc.
+
     const profile = await fetchProfile(data.accessToken);
     TokenStorage.save(data.accessToken, data.refreshToken, profile);
     setToken(data.accessToken);
