@@ -9,7 +9,7 @@ import {
 import { TokenStorage, authFetch } from '../auth/tokenManager';
 import { UserProfile } from '../types/reservation.types';
 
-const AUTH_URL = 'https://authservice-version-90.onrender.com' ;
+const AUTH_URL = import.meta.env.VITE_AUTHSERV_URL || 'http://localhost:3000';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 
@@ -45,28 +45,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ── Login with email/password ─────────────────────────────────────────────
 
   const login = async (email: string, password: string) => {
-    fetch('https://authservice-version-90.onrender.com/auth/login', {
+    const res = await fetch(`${AUTH_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        email: 'Sara.Mansouri@test.com', 
-        password: 'password123' 
-      })
-    })
-    .then(res => {
-      console.log('Status:', res.status);
-      console.log('Headers:', [...res.headers]);
-      return res.json();
-    })
-    .then(data => console.log('Data:', data))
-    .catch(err => console.error('Error:', err));
+      body: JSON.stringify({ email, password }),
+    });
+
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.message || 'Email ou mot de passe incorrect');
     }
 
     const data = await res.json();
-
+    // Backend returns: { message, accessToken, refreshToken }
+    // Fetch full profile to get firstName/lastName/role/etc.
     const profile = await fetchProfile(data.accessToken);
     TokenStorage.save(data.accessToken, data.refreshToken, profile);
     setToken(data.accessToken);
