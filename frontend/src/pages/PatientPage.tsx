@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useMeetings } from '../hooks/useMeetings';
 import { Reservation, TYPE } from '../types/reservation.types';
-import { Video, Clock, Calendar, Search, ChevronDown, LogOut, Users, Plus } from 'lucide-react';
-import DoctorDetailsModal from '../components/DoctorDetailsModel';
-import { reservationApi } from '../api/reservation.api';
+import { Video, Clock, Calendar, Search, ChevronDown, LogOut, Users, Plus, Loader } from 'lucide-react';
+import DoctorDetailsModal from '../components/DoctorDetailsModal';
+import { reservationApi, doctorApi, Doctor } from '../api/reservation.api';
 
 // ── Helper: check if "Join" button should be enabled ────────────────────────
 function canJoinMeeting(reservation: Reservation): { canJoin: boolean; label: string } {
@@ -77,6 +76,10 @@ export default function PatientPage() {
   const [activeTab, setActiveTab] = useState<'appointments' | 'doctors'>('appointments');
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(false);
+  const [doctorsError, setDoctorsError] = useState<string | null>(null);
+  const [requestingId, setRequestingId] = useState<string | null>(null);
 
   const handleRequestAppointment = async (reason: string) => {
     if (!selectedDoctor || !user) throw new Error('Données manquantes');
@@ -92,6 +95,46 @@ export default function PatientPage() {
   const handleDoctorClick = (doctor: Doctor) => {
     setSelectedDoctor(doctor);
     setIsModalOpen(true);
+  };
+
+  // Fetch doctors from API
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      setDoctorsLoading(true);
+      setDoctorsError(null);
+      try {
+        const data = await doctorApi.getAll();
+        setDoctors(data);
+      } catch (err: any) {
+        console.error('Error fetching doctors:', err);
+        setDoctorsError('Erreur lors de la récupération des médecins');
+      } finally {
+        setDoctorsLoading(false);
+      }
+    };
+
+    if (activeTab === 'doctors') {
+      fetchDoctors();
+    }
+  }, [activeTab]);
+
+  // Handle quick appointment request without modal
+  const handleQuickRequest = async (doctor: Doctor, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRequestingId(doctor.id);
+    try {
+      await reservationApi.requestAppointment({
+        doctorId: doctor.id,
+        reason: `Demande de consultation avec le Dr. ${doctor.firstName} ${doctor.lastName}`,
+      });
+      refresh();
+      // Show success feedback
+      alert('Demande envoyée avec succès!');
+    } catch (err: any) {
+      alert('Erreur: ' + err.message);
+    } finally {
+      setRequestingId(null);
+    }
   };
 
   // Force re-render every minute for countdown
@@ -118,8 +161,9 @@ export default function PatientPage() {
   ];
 
   const [searchTerm, setSearchTerm] = useState('');
-  const filteredDoctors = mockDoctors.filter((doc) =>
-    doc.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredDoctors = doctors.filter((doc) =>
+    `${doc.firstName} ${doc.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    doc.specialty?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -337,38 +381,92 @@ export default function PatientPage() {
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Médecin</th>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Spécialité</th>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Type</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {filteredDoctors.map((doctor) => (
-                        <tr
-                          key={doctor.id}
-                          className="hover:bg-blue-50 transition-colors cursor-pointer"
-                          onClick={() => handleDoctorClick(doctor)}
-                        >
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-lg">
-                                {doctor.avatar}
-                              </div>
-                              <span className="font-medium text-gray-900">{doctor.name}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="text-sm text-gray-600">{doctor.specialty}</span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex gap-2">
-                              <span className="inline-flex items-center gap-1 text-sm text-gray-600 px-3 py-1 bg-gray-100 rounded-full">
-                                🏥 Présentiel
-                              </span>
-                              <span className="inline-flex items-center gap-1 text-sm text-blue-600 px-3 py-1 bg-blue-100 rounded-full">
-                                📹 Vidéo
-                              </span>
+                      {doctorsLoading ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-12 text-center">
+                            <div className="flex items-center justify-center gap-2 text-gray-500">
+                              <Loader className="w-4 h-4 animate-spin" />
+                              Chargement des médecins...
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      ) : doctorsError ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-12 text-center text-red-600">
+                            {doctorsError}
+                          </td>
+                        </tr>
+                      ) : filteredDoctors.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                            Aucun médecin trouvé
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredDoctors.map((doctor) => (
+                          <tr
+                            key={doctor.id}
+                            className="hover:bg-blue-50 transition-colors"
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleDoctorClick(doctor)}>
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-lg text-white font-bold">
+                                  {doctor.firstName?.charAt(0) || '👨'}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-900">Dr. {doctor.firstName} {doctor.lastName}</span>
+                                  <p className="text-xs text-gray-500">{doctor.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-sm text-gray-600">{doctor.specialty || 'Non spécifié'}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex gap-2">
+                                <span className="inline-flex items-center gap-1 text-sm text-gray-600 px-3 py-1 bg-gray-100 rounded-full">
+                                  🏥 Présentiel
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-sm text-blue-600 px-3 py-1 bg-blue-100 rounded-full">
+                                  📹 Vidéo
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={(e) => handleQuickRequest(doctor, e)}
+                                  disabled={requestingId === doctor.id}
+                                  className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {requestingId === doctor.id ? (
+                                    <>
+                                      <Loader className="w-4 h-4 animate-spin" />
+                                      Envoi...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="w-4 h-4" />
+                                      Demande
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => handleDoctorClick(doctor)}
+                                  className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                                >
+                                  <Video className="w-4 h-4" />
+                                  Détails
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>

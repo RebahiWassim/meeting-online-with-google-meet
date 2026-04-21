@@ -140,3 +140,21 @@ export const scheduleApi = {
     return res.json();
   },
 };
+
+// ─── Doctors ──────────────────────────────────────────────────────────────────
+export const doctorApi = {
+  /** Get all available doctors */
+  getAll: async () => {
+    const res = await authFetch(`${BASE}/user/doctors`);
+    if (!res.ok)
+      throw new Error('Erreur récupération des médecins');
+    return res.json();
+  },
+  /** Get a specific doctor by ID */
+  getById: async (doctorId) => {
+    const res = await authFetch(`${BASE}/user/doctor/${doctorId}`);
+    if (!res.ok)
+      throw new Error('Erreur récupération du médecin');
+    return res.json();
+  },
+};

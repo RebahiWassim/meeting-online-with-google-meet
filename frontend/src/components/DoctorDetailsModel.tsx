@@ -1,15 +1,7 @@
 import { useState } from 'react';
 import { X, Clock, MapPin, Phone, Loader } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-interface Doctor {
-    id: string;
-    name: string;
-    specialty: string;
-    avatar: string;
-    establishment?: string;
-    phone?: string;
-}
+import { Doctor } from '../api/reservation.api';
 
 interface Props {
     doctor: Doctor;
@@ -78,13 +70,14 @@ export default function DoctorDetailsModal({ doctor, isOpen, onClose, onRequestA
                         {/* Doctor Info */}
                         <div className="bg-blue-50 rounded-xl p-6 mb-6">
                             <div className="flex gap-4">
-                                <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-3xl flex-shrink-0">
-                                    {doctor.avatar}
+                                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
+                                    {doctor.firstName?.charAt(0) || 'D'}
                                 </div>
                                 <div className="flex-1">
                                     <p className="text-sm text-gray-500 font-medium">MÉDECIN</p>
-                                    <p className="text-lg font-semibold text-gray-900 mt-1">{doctor.name}</p>
+                                    <p className="text-lg font-semibold text-gray-900 mt-1">Dr. {doctor.firstName} {doctor.lastName}</p>
                                     <p className="text-sm text-blue-600 font-medium mt-1">{doctor.specialty}</p>
+                                    <p className="text-xs text-gray-600 mt-2">{doctor.email}</p>
                                 </div>
                             </div>
                         </div>
