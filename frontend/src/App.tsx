@@ -109,7 +109,7 @@ export default function App() {
   return (
     <AuthProvider>
 
-        <AppRoutes />
+      <AppRoutes />
 
     </AuthProvider>
   );

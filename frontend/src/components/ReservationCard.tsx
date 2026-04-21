@@ -47,7 +47,7 @@ export default function ReservationCard({
   onCancel,
 }: Props) {
   const { schedule, reservationStatus, reason, patientId, doctorId } = reservation;
-  
+
   // Déterminer le statut affiché
   const status = reservationStatus ? 'active' : 'cancelled';
   const config = statusConfig[status];

@@ -166,11 +166,10 @@ export default function CreateMeetingForm({ onSuccess }: CreateMeetingFormProps)
                   key={slot.id}
                   type="button"
                   onClick={() => setSelectedSlot(slot)}
-                  className={`text-left border rounded-lg p-3 text-sm transition-colors ${
-                    selectedSlot?.id === slot.id
+                  className={`text-left border rounded-lg p-3 text-sm transition-colors ${selectedSlot?.id === slot.id
                       ? 'border-blue-500 bg-blue-50 text-blue-800'
                       : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <p className="font-medium capitalize">
                     {slot.dayOfWeek.toLowerCase()}

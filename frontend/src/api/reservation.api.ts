@@ -9,6 +9,7 @@ import {
   Schedule,
   CreateReservationPayload,
   CreateSchedulePayload,
+  AppointmentRequestStatus,
 } from '../types/reservation.types';
 
 const BASE = import.meta.env.VITE_API_URL || '';
@@ -56,6 +57,62 @@ export const reservationApi = {
   getById: async (reservationId: string): Promise<Reservation> => {
     const res = await authFetch(`${BASE}/reservation/${reservationId}`);
     if (!res.ok) throw new Error('Erreur récupération de la réservation');
+    return res.json();
+  },
+
+  /** Request an appointment (patient sends request to doctor) */
+  requestAppointment: async (payload: {
+    doctorId: string;
+    reason: string;
+  }): Promise<Reservation> => {
+    const res = await authFetch(`${BASE}/reservation/request`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Erreur lors de la demande');
+    }
+    return res.json();
+  },
+
+  /** Get pending appointment requests for a doctor */
+  getPendingRequests: async (doctorId: string): Promise<Reservation[]> => {
+    const res = await authFetch(`${BASE}/reservation/pending/${doctorId}`);
+    if (!res.ok) throw new Error('Erreur récupération des demandes');
+    return res.json();
+  },
+
+  /** Doctor accepts an appointment request */
+  acceptRequest: async (reservationId: string): Promise<Reservation> => {
+    const res = await authFetch(`${BASE}/reservation/accept/${reservationId}`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Erreur acceptation');
+    }
+    return res.json();
+  },
+
+  /** Doctor rejects an appointment request */
+  rejectRequest: async (reservationId: string): Promise<{ message: string }> => {
+    const res = await authFetch(`${BASE}/reservation/reject/${reservationId}`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Erreur refus de la demande');
+    return res.json();
+  },
+
+  /** Doctor creates a meeting room and gets the URL */
+  createMeeting: async (reservationId: string): Promise<{ meetingUrl: string; meetingRoomName: string }> => {
+    const res = await authFetch(`${BASE}/reservation/create-meeting/${reservationId}`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Erreur création du meeting');
+    }
     return res.json();
   },
 };

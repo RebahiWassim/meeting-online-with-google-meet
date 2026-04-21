@@ -1,16 +1,16 @@
 // ── Enums matching the backend ──────────────────────────────────────────────
 
 export enum DAY {
-  SUNDAY    = 'SUNDAY',
-  MONDAY    = 'MONDAY',
-  TUESDAY   = 'TUESDAY',
+  SUNDAY = 'SUNDAY',
+  MONDAY = 'MONDAY',
+  TUESDAY = 'TUESDAY',
   WEDNESDAY = 'WEDNESDAY',
-  THURSDAY  = 'THURSDAY',
-  FRIDAY    = 'FRIDAY',
+  THURSDAY = 'THURSDAY',
+  FRIDAY = 'FRIDAY',
 }
 
 export enum TYPE {
-  ONLINE     = 'ONLINE',
+  ONLINE = 'ONLINE',
   ATTENDANCE = 'ATTENDANCE',
 }
 
@@ -26,6 +26,14 @@ export interface Schedule {
   status: boolean;     // true = available
 }
 
+// ── Appointment Request Status ───────────────────────────────────────────────
+
+export enum AppointmentRequestStatus {
+  PENDING = 'PENDING',
+  ACCEPTED = 'ACCEPTED',
+  REJECTED = 'REJECTED',
+}
+
 // ── Reservation entity ───────────────────────────────────────────────────────
 
 export interface Reservation {
@@ -39,6 +47,9 @@ export interface Reservation {
   schedule: Schedule;
   meetingUrl?: string;
   meetingRoomName?: string;
+  appointmentRequestStatus?: AppointmentRequestStatus;
+  requestedAt?: string;
+  patientName?: string;
 }
 
 // ── Auth payloads ─────────────────────────────────────────────────────────────

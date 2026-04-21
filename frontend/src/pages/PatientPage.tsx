@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useMeetings } from '../hooks/useMeetings';
 import { Reservation, TYPE } from '../types/reservation.types';
 import { Video, Clock, Calendar, Search, ChevronDown, LogOut, Users, Plus } from 'lucide-react';
+import DoctorDetailsModal from '../components/DoctorDetailsModal';
+import { reservationApi } from '../api/reservation.api';
 
 // ── Helper: check if "Join" button should be enabled ────────────────────────
 function canJoinMeeting(reservation: Reservation): { canJoin: boolean; label: string } {
@@ -61,11 +63,36 @@ const dayLabels: Record<string, string> = {
   THURSDAY: 'Jeudi', FRIDAY: 'Vendredi', SATURDAY: 'Samedi', SUNDAY: 'Dimanche',
 };
 
+interface Doctor {
+  id: string;
+  name: string;
+  specialty: string;
+  avatar: string;
+}
+
 export default function PatientPage() {
   const { user, logout } = useAuth();
   const { reservations, loading, error, refresh } = useMeetings();
 
   const [activeTab, setActiveTab] = useState<'appointments' | 'doctors'>('appointments');
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleRequestAppointment = async (reason: string) => {
+    if (!selectedDoctor || !user) throw new Error('Données manquantes');
+
+    await reservationApi.requestAppointment({
+      doctorId: selectedDoctor.id,
+      reason,
+    });
+
+    refresh();
+  };
+
+  const handleDoctorClick = (doctor: Doctor) => {
+    setSelectedDoctor(doctor);
+    setIsModalOpen(true);
+  };
 
   // Force re-render every minute for countdown
   const [, setTick] = useState(0);
@@ -108,22 +135,20 @@ export default function PatientPage() {
           <nav className="space-y-1">
             <button
               onClick={() => setActiveTab('appointments')}
-              className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-3 ${
-                activeTab === 'appointments'
+              className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-3 ${activeTab === 'appointments'
                   ? 'bg-blue-50 text-blue-600 font-medium'
                   : 'text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <Video className="w-4 h-4" />
               Mes Rendez-vous
             </button>
             <button
               onClick={() => setActiveTab('doctors')}
-              className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-3 ${
-                activeTab === 'doctors'
+              className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-3 ${activeTab === 'doctors'
                   ? 'bg-blue-50 text-blue-600 font-medium'
                   : 'text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <Users className="w-4 h-4" />
               Médecins
@@ -168,21 +193,19 @@ export default function PatientPage() {
             <div className="flex gap-6">
               <button
                 onClick={() => setActiveTab('appointments')}
-                className={`py-4 px-2 border-b-2 text-sm font-medium transition-colors ${
-                  activeTab === 'appointments'
+                className={`py-4 px-2 border-b-2 text-sm font-medium transition-colors ${activeTab === 'appointments'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 Mes Rendez-vous ({activeReservations.length})
               </button>
               <button
                 onClick={() => setActiveTab('doctors')}
-                className={`py-4 px-2 border-b-2 text-sm font-medium transition-colors ${
-                  activeTab === 'doctors'
+                className={`py-4 px-2 border-b-2 text-sm font-medium transition-colors ${activeTab === 'doctors'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 Médecins disponibles
               </button>
@@ -318,7 +341,11 @@ export default function PatientPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {filteredDoctors.map((doctor) => (
-                        <tr key={doctor.id} className="hover:bg-gray-50 transition-colors">
+                        <tr
+                          key={doctor.id}
+                          className="hover:bg-blue-50 transition-colors cursor-pointer"
+                          onClick={() => handleDoctorClick(doctor)}
+                        >
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-lg">
@@ -332,10 +359,10 @@ export default function PatientPage() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex gap-2">
-                              <span className="inline-flex items-center gap-1 text-sm text-gray-600">
+                              <span className="inline-flex items-center gap-1 text-sm text-gray-600 px-3 py-1 bg-gray-100 rounded-full">
                                 🏥 Présentiel
                               </span>
-                              <span className="inline-flex items-center gap-1 text-sm text-gray-600">
+                              <span className="inline-flex items-center gap-1 text-sm text-blue-600 px-3 py-1 bg-blue-100 rounded-full">
                                 📹 Vidéo
                               </span>
                             </div>
@@ -350,6 +377,19 @@ export default function PatientPage() {
           )}
         </main>
       </div>
+
+      {/* Doctor Details Modal */}
+      {selectedDoctor && (
+        <DoctorDetailsModal
+          doctor={selectedDoctor}
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedDoctor(null);
+          }}
+          onRequestAppointment={handleRequestAppointment}
+        />
+      )}
     </div>
   );
 }

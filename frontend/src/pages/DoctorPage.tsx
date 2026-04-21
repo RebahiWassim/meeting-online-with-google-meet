@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useMeetings } from '../hooks/useMeetings';
-import { DAY, TYPE, CreateSchedulePayload, Reservation } from '../types/reservation.types';
-import { X, Video, Clock, Calendar, Plus, LogOut, Users, CalendarDays } from 'lucide-react';
+import { DAY, TYPE, CreateSchedulePayload, Reservation, AppointmentRequestStatus } from '../types/reservation.types';
+import { X, Video, Clock, Calendar, Plus, LogOut, Users, CalendarDays, Check, XCircle, Loader } from 'lucide-react';
+import { reservationApi } from '../api/reservation.api';
 
 // ── Helper: check if "Join" button should be enabled ────────────────────────
 // Enabled 10 minutes before the consultation start time
@@ -71,8 +72,11 @@ export default function DoctorPage() {
   const { user, logout } = useAuth();
   const { reservations, schedules, loading, error, refresh, createSchedule } = useMeetings();
 
-  const [activeTab, setActiveTab] = useState<'consultations' | 'schedule'>('consultations');
+  const [activeTab, setActiveTab] = useState<'consultations' | 'requests' | 'schedule'>('consultations');
   const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<Reservation[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [creatingMeeting, setCreatingMeeting] = useState<string | null>(null);
   const [scheduleForm, setScheduleForm] = useState<CreateSchedulePayload>({
     doctorId: user?.id || '',
     dayOfWeek: DAY.MONDAY,
@@ -82,6 +86,24 @@ export default function DoctorPage() {
   });
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Fetch pending requests on mount and when tab changes
+  useEffect(() => {
+    if (activeTab === 'requests' && user?.id) {
+      const fetchRequests = async () => {
+        setLoadingRequests(true);
+        try {
+          const requests = await reservationApi.getPendingRequests(user.id);
+          setPendingRequests(requests);
+        } catch (err: any) {
+          console.error('Error fetching requests:', err);
+        } finally {
+          setLoadingRequests(false);
+        }
+      };
+      fetchRequests();
+    }
+  }, [activeTab, user?.id]);
 
   // Refresh every 30 seconds to update join button state
   useEffect(() => {
@@ -95,6 +117,47 @@ export default function DoctorPage() {
     const timer = setInterval(() => setTick(t => t + 1), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleAcceptRequest = async (reservationId: string) => {
+    try {
+      await reservationApi.acceptRequest(reservationId);
+      setPendingRequests(prev => prev.map(r =>
+        r.id === reservationId
+          ? { ...r, appointmentRequestStatus: AppointmentRequestStatus.ACCEPTED }
+          : r
+      ));
+      refresh();
+    } catch (err: any) {
+      console.error('Error accepting request:', err);
+    }
+  };
+
+  const handleRejectRequest = async (reservationId: string) => {
+    try {
+      await reservationApi.rejectRequest(reservationId);
+      setPendingRequests(prev => prev.filter(r => r.id !== reservationId));
+      refresh();
+    } catch (err: any) {
+      console.error('Error rejecting request:', err);
+    }
+  };
+
+  const handleCreateMeeting = async (reservationId: string) => {
+    setCreatingMeeting(reservationId);
+    try {
+      const result = await reservationApi.createMeeting(reservationId);
+      setPendingRequests(prev => prev.map(r =>
+        r.id === reservationId
+          ? { ...r, meetingUrl: result.meetingUrl, meetingRoomName: result.meetingRoomName }
+          : r
+      ));
+      refresh();
+    } catch (err: any) {
+      console.error('Error creating meeting:', err);
+    } finally {
+      setCreatingMeeting(null);
+    }
+  };
 
   const handleCreateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +185,12 @@ export default function DoctorPage() {
 
   const sidebarItems = [
     { label: 'Consultations', icon: <Video className="w-4 h-4" />, tab: 'consultations' as const },
+    {
+      label: 'Demandes',
+      icon: <Users className="w-4 h-4" />,
+      tab: 'requests' as const,
+      badge: pendingRequests.length > 0 ? pendingRequests.length : undefined
+    },
     { label: 'Schedule', icon: <CalendarDays className="w-4 h-4" />, tab: 'schedule' as const },
   ];
 
@@ -140,14 +209,20 @@ export default function DoctorPage() {
               <button
                 key={item.label}
                 onClick={() => setActiveTab(item.tab)}
-                className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-3 ${
-                  activeTab === item.tab
+                className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-3 justify-between ${activeTab === item.tab
                     ? 'bg-blue-50 text-blue-600 font-medium'
                     : 'text-gray-600 hover:bg-gray-50'
-                }`}
+                  }`}
               >
-                {item.icon}
-                {item.label}
+                <span className="flex items-center gap-3">
+                  {item.icon}
+                  {item.label}
+                </span>
+                {item.badge && (
+                  <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    {item.badge}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -175,12 +250,14 @@ export default function DoctorPage() {
           <div className="px-8 py-6 flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                {activeTab === 'consultations' ? 'Mes Consultations' : 'Mon Planning'}
+                {activeTab === 'consultations' ? 'Mes Consultations' : activeTab === 'requests' ? 'Demandes de Rendez-vous' : 'Mon Planning'}
               </h1>
               <p className="text-sm text-gray-500 mt-1">
                 {activeTab === 'consultations'
                   ? 'Gérez vos rendez-vous et rejoignez vos consultations en ligne'
-                  : 'Configurez vos créneaux de disponibilité'}
+                  : activeTab === 'requests'
+                    ? 'Acceptez ou refusez les demandes de rendez-vous des patients'
+                    : 'Configurez vos créneaux de disponibilité'}
               </p>
             </div>
             {activeTab === 'schedule' && (
@@ -297,6 +374,116 @@ export default function DoctorPage() {
             </div>
           )}
 
+          {/* ═══ REQUESTS TAB ═══ */}
+          {activeTab === 'requests' && (
+            <div>
+              {loadingRequests ? (
+                <div className="text-center py-12">
+                  <div className="text-4xl mb-3 animate-pulse">📋</div>
+                  <p className="text-gray-500">Chargement des demandes...</p>
+                </div>
+              ) : pendingRequests.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+                  <p className="text-5xl mb-4">✨</p>
+                  <p className="text-gray-500 mb-2">Aucune demande en attente</p>
+                  <p className="text-sm text-gray-400">Les demandes de rendez-vous des patients apparaîtront ici.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingRequests.map((request) => (
+                    <div
+                      key={request.id}
+                      className="bg-white border border-yellow-200 rounded-xl p-6 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${request.appointmentRequestStatus === AppointmentRequestStatus.ACCEPTED
+                                ? 'bg-green-100 text-green-700'
+                                : request.appointmentRequestStatus === AppointmentRequestStatus.REJECTED
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-yellow-100 text-yellow-700'
+                              }`}>
+                              {request.appointmentRequestStatus === AppointmentRequestStatus.ACCEPTED
+                                ? 'Acceptée'
+                                : request.appointmentRequestStatus === AppointmentRequestStatus.REJECTED
+                                  ? 'Refusée'
+                                  : 'En attente'}
+                            </span>
+                          </div>
+                          <p className="text-gray-900 font-semibold text-lg">{request.reason}</p>
+                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <Users className="w-4 h-4" />
+                              Patient: {request.patientName || request.patientId.slice(0, 8)}...
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-2">
+                            Demandé le: {request.requestedAt ? new Date(request.requestedAt).toLocaleDateString('fr-FR') : '-'}
+                          </p>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="ml-4 flex-shrink-0 flex gap-2">
+                          {request.appointmentRequestStatus === AppointmentRequestStatus.PENDING && (
+                            <>
+                              <button
+                                onClick={() => handleAcceptRequest(request.id)}
+                                className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                              >
+                                <Check className="w-4 h-4" />
+                                Accepter
+                              </button>
+                              <button
+                                onClick={() => handleRejectRequest(request.id)}
+                                className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+                              >
+                                <XCircle className="w-4 h-4" />
+                                Refuser
+                              </button>
+                            </>
+                          )}
+
+                          {request.appointmentRequestStatus === AppointmentRequestStatus.ACCEPTED && !request.meetingUrl && (
+                            <button
+                              onClick={() => handleCreateMeeting(request.id)}
+                              disabled={creatingMeeting === request.id}
+                              className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                            >
+                              {creatingMeeting === request.id ? (
+                                <>
+                                  <Loader className="w-4 h-4 animate-spin" />
+                                  Création...
+                                </>
+                              ) : (
+                                <>
+                                  <Video className="w-4 h-4" />
+                                  Créer le meeting
+                                </>
+                              )}
+                            </button>
+                          )}
+
+                          {request.meetingUrl && (
+                            <a
+                              href={request.meetingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                            >
+                              <Video className="w-4 h-4" />
+                              Lien du Meeting
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ═══ SCHEDULE TAB ═══ */}
           {activeTab === 'schedule' && !loading && (
             <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -332,18 +519,16 @@ export default function DoctorPage() {
                         <span className="text-sm text-gray-600">
                           {s.startTime} - {s.endTime}
                         </span>
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium inline-flex items-center gap-1 w-fit ${
-                          s.appointmenttype === TYPE.ONLINE
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium inline-flex items-center gap-1 w-fit ${s.appointmenttype === TYPE.ONLINE
                             ? 'bg-blue-100 text-blue-700'
                             : 'bg-orange-100 text-orange-700'
-                        }`}>
+                          }`}>
                           {s.appointmenttype === TYPE.ONLINE ? '📹 En ligne' : '🏥 Présentiel'}
                         </span>
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium w-fit ${
-                          s.status
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium w-fit ${s.status
                             ? 'bg-green-100 text-green-700'
                             : 'bg-red-100 text-red-700'
-                        }`}>
+                          }`}>
                           {s.status ? 'Disponible' : 'Réservé'}
                         </span>
                       </div>
