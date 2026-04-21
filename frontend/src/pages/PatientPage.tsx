@@ -359,114 +359,82 @@ export default function PatientPage() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Rechercher un médecin..."
+                    placeholder="Rechercher un médecin ou spécialité..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Médecin</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Spécialité</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Type</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {doctorsLoading ? (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-12 text-center">
-                            <div className="flex items-center justify-center gap-2 text-gray-500">
-                              <Loader className="w-4 h-4 animate-spin" />
-                              Chargement des médecins...
-                            </div>
-                          </td>
-                        </tr>
-                      ) : doctorsError ? (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-12 text-center text-red-600">
-                            {doctorsError}
-                          </td>
-                        </tr>
-                      ) : filteredDoctors.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
-                            Aucun médecin trouvé
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredDoctors.map((doctor) => (
-                          <tr
-                            key={doctor.id}
-                            className="hover:bg-blue-50 transition-colors"
-                          >
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleDoctorClick(doctor)}>
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-lg text-white font-bold">
-                                  {doctor.firstName?.charAt(0) || '👨'}
-                                </div>
-                                <div>
-                                  <span className="font-medium text-gray-900">Dr. {doctor.firstName} {doctor.lastName}</span>
-                                  <p className="text-xs text-gray-500">{doctor.email}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-sm text-gray-600">{doctor.specialty || 'Non spécifié'}</span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex gap-2">
-                                <span className="inline-flex items-center gap-1 text-sm text-gray-600 px-3 py-1 bg-gray-100 rounded-full">
-                                  🏥 Présentiel
-                                </span>
-                                <span className="inline-flex items-center gap-1 text-sm text-blue-600 px-3 py-1 bg-blue-100 rounded-full">
-                                  📹 Vidéo
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={(e) => handleQuickRequest(doctor, e)}
-                                  disabled={requestingId === doctor.id}
-                                  className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {requestingId === doctor.id ? (
-                                    <>
-                                      <Loader className="w-4 h-4 animate-spin" />
-                                      Envoi...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Plus className="w-4 h-4" />
-                                      Demande
-                                    </>
-                                  )}
-                                </button>
-                                <button
-                                  onClick={() => handleDoctorClick(doctor)}
-                                  className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                                >
-                                  <Video className="w-4 h-4" />
-                                  Détails
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+              {doctorsLoading ? (
+                <div className="text-center py-16">
+                  <Loader className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-3" />
+                  <p className="text-gray-500">Chargement des médecins...</p>
                 </div>
-              </div>
+              ) : doctorsError ? (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center text-red-600">
+                  {doctorsError}
+                </div>
+              ) : filteredDoctors.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+                  <p className="text-4xl mb-3">🔍</p>
+                  <p className="text-gray-500">Aucun médecin trouvé</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredDoctors.map((doctor) => (
+                    <div
+                      key={doctor.id}
+                      className="bg-white border border-gray-200 rounded-xl px-6 py-5 flex items-center justify-between hover:shadow-md hover:border-blue-200 transition-all"
+                    >
+                      {/* Doctor identity */}
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xl font-bold text-white flex-shrink-0">
+                          {doctor.firstName?.charAt(0)?.toUpperCase() || 'D'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 truncate">
+                            Dr. {doctor.firstName} {doctor.lastName}
+                          </p>
+                          <p className="text-sm text-gray-500 truncate">{doctor.email}</p>
+                        </div>
+                      </div>
+
+                      {/* Specialty */}
+                      <div className="hidden sm:block w-44 flex-shrink-0 px-4">
+                        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 bg-blue-50 px-3 py-1 rounded-full">
+                          🩺 {doctor.specialty || 'Généraliste'}
+                        </span>
+                      </div>
+
+                      {/* Consultation types */}
+                      <div className="hidden md:flex gap-2 w-48 flex-shrink-0 px-2">
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-600 px-2.5 py-1 bg-gray-100 rounded-full">
+                          🏥 Présentiel
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-xs text-blue-600 px-2.5 py-1 bg-blue-50 rounded-full">
+                          📹 Vidéo
+                        </span>
+                      </div>
+
+                      {/* CTA */}
+                      <div className="flex-shrink-0 ml-4">
+                        <button
+                          onClick={() => handleDoctorClick(doctor)}
+                          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors shadow-sm"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Prendre rendez-vous
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
+
         </main>
       </div>
 
