@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useMeetings } from '../hooks/useMeetings';
 import { Reservation, TYPE } from '../types/reservation.types';
 import { Video, Clock, Calendar, Search, ChevronDown, LogOut, Users, Plus } from 'lucide-react';
-import DoctorDetailsModal from '../components/DoctorDetailsModal';
+import DoctorDetailsModal from '../components/DoctorDetailsModel';
 import { reservationApi } from '../api/reservation.api';
 
 // ── Helper: check if "Join" button should be enabled ────────────────────────
@@ -136,8 +136,8 @@ export default function PatientPage() {
             <button
               onClick={() => setActiveTab('appointments')}
               className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-3 ${activeTab === 'appointments'
-                  ? 'bg-blue-50 text-blue-600 font-medium'
-                  : 'text-gray-600 hover:bg-gray-50'
+                ? 'bg-blue-50 text-blue-600 font-medium'
+                : 'text-gray-600 hover:bg-gray-50'
                 }`}
             >
               <Video className="w-4 h-4" />
@@ -146,8 +146,8 @@ export default function PatientPage() {
             <button
               onClick={() => setActiveTab('doctors')}
               className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-3 ${activeTab === 'doctors'
-                  ? 'bg-blue-50 text-blue-600 font-medium'
-                  : 'text-gray-600 hover:bg-gray-50'
+                ? 'bg-blue-50 text-blue-600 font-medium'
+                : 'text-gray-600 hover:bg-gray-50'
                 }`}
             >
               <Users className="w-4 h-4" />
@@ -194,8 +194,8 @@ export default function PatientPage() {
               <button
                 onClick={() => setActiveTab('appointments')}
                 className={`py-4 px-2 border-b-2 text-sm font-medium transition-colors ${activeTab === 'appointments'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
                   }`}
               >
                 Mes Rendez-vous ({activeReservations.length})
@@ -203,8 +203,8 @@ export default function PatientPage() {
               <button
                 onClick={() => setActiveTab('doctors')}
                 className={`py-4 px-2 border-b-2 text-sm font-medium transition-colors ${activeTab === 'doctors'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
                   }`}
               >
                 Médecins disponibles
