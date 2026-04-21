@@ -1,19 +1,86 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useMeetings } from '../hooks/useMeetings';
-import { Reservation } from '../types/reservation.types';
-import { ChevronDown, Search, Plus } from 'lucide-react';
+import { Reservation, TYPE } from '../types/reservation.types';
+import { Video, Clock, Calendar, Search, ChevronDown, LogOut, Users, Plus } from 'lucide-react';
+
+// ── Helper: check if "Join" button should be enabled ────────────────────────
+function canJoinMeeting(reservation: Reservation): { canJoin: boolean; label: string } {
+  if (!reservation.meetingUrl) return { canJoin: false, label: 'Pas de lien' };
+  if (!reservation.schedule && !reservation.reservationTime) return { canJoin: false, label: 'Horaire inconnu' };
+
+  const now = new Date();
+  const currentDay = now.getDay();
+
+  const dayMap: Record<string, number> = {
+    SUNDAY: 0, MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3,
+    THURSDAY: 4, FRIDAY: 5, SATURDAY: 6,
+  };
+
+  const reservationDay = reservation.schedule?.dayOfWeek || reservation.reservationDay;
+  const startTime = reservation.schedule?.startTime || reservation.reservationTime;
+
+  const targetDay = dayMap[reservationDay] ?? -1;
+  if (targetDay === -1) return { canJoin: false, label: 'Jour inconnu' };
+
+  let daysUntil = targetDay - currentDay;
+  if (daysUntil < 0) daysUntil += 7;
+
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const meetingDate = new Date(now);
+  meetingDate.setDate(meetingDate.getDate() + daysUntil);
+  meetingDate.setHours(hours, minutes, 0, 0);
+
+  if (daysUntil === 0 && meetingDate.getTime() < now.getTime() - 60 * 60 * 1000) {
+    meetingDate.setDate(meetingDate.getDate() + 7);
+  }
+
+  const diffMs = meetingDate.getTime() - now.getTime();
+  const diffMin = diffMs / (1000 * 60);
+
+  if (diffMin <= 10 && diffMin > -60) {
+    return { canJoin: true, label: 'Rejoindre' };
+  }
+
+  if (diffMin > 10) {
+    if (diffMin < 60) return { canJoin: false, label: `Dans ${Math.ceil(diffMin)} min` };
+    if (diffMin < 1440) {
+      const h = Math.floor(diffMin / 60);
+      const m = Math.ceil(diffMin % 60);
+      return { canJoin: false, label: `Dans ${h}h${m > 0 ? m + 'min' : ''}` };
+    }
+    const d = Math.ceil(diffMin / 1440);
+    return { canJoin: false, label: `Dans ${d} jour${d > 1 ? 's' : ''}` };
+  }
+
+  return { canJoin: false, label: 'Terminée' };
+}
+
+const dayLabels: Record<string, string> = {
+  MONDAY: 'Lundi', TUESDAY: 'Mardi', WEDNESDAY: 'Mercredi',
+  THURSDAY: 'Jeudi', FRIDAY: 'Vendredi', SATURDAY: 'Samedi', SUNDAY: 'Dimanche',
+};
 
 export default function PatientPage() {
   const { user, logout } = useAuth();
   const { reservations, loading, error, refresh } = useMeetings();
 
   const [activeTab, setActiveTab] = useState<'appointments' | 'doctors'>('appointments');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
 
-  const activeReservations = reservations.filter((r : Reservation) => r.reservationStatus === true);
+  // Force re-render every minute for countdown
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Refresh every 30s
+  useEffect(() => {
+    const interval = setInterval(() => refresh(), 30000);
+    return () => clearInterval(interval);
+  }, [refresh]);
+
+  const activeReservations = reservations.filter((r: Reservation) => r.reservationStatus === true);
 
   const mockDoctors = [
     { id: '1', name: 'Dehmani Mohamed', specialty: 'Cardiologie', avatar: '👨‍⚕️' },
@@ -23,20 +90,14 @@ export default function PatientPage() {
     { id: '5', name: 'Dr. Ibrahim Ali', specialty: 'Orthopédie', avatar: '👨‍⚕️' },
   ];
 
-  const filteredDoctors = mockDoctors.filter((doc : { name: string }) =>
+  const [searchTerm, setSearchTerm] = useState('');
+  const filteredDoctors = mockDoctors.filter((doc) =>
     doc.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const paginatedDoctors = filteredDoctors.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const totalPages = Math.ceil(filteredDoctors.length / itemsPerPage);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Sidebar Navigation */}
+      {/* Sidebar */}
       <div className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 p-6 flex flex-col">
         <div className="mb-12">
           <div className="flex items-center gap-3 mb-8">
@@ -44,34 +105,38 @@ export default function PatientPage() {
             <span className="text-lg font-semibold text-gray-900">platformName</span>
           </div>
 
-          <nav className="space-y-2">
-            {[
-              { label: 'Overview', icon: '📊' },
-              { label: 'Appointments', icon: '📅', active: true },
-              { label: 'Analysis', icon: '📈' },
-              { label: 'Schedule', icon: '🗓️' },
-              { label: 'Consultation', icon: '💬' },
-            ].map((item) => (
-              <button
-                key={item.label}
-                className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors ${
-                  item.active
-                    ? 'bg-blue-50 text-blue-600 font-medium'
-                    : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                <span className="mr-3">{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
+          <nav className="space-y-1">
+            <button
+              onClick={() => setActiveTab('appointments')}
+              className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-3 ${
+                activeTab === 'appointments'
+                  ? 'bg-blue-50 text-blue-600 font-medium'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Video className="w-4 h-4" />
+              Mes Rendez-vous
+            </button>
+            <button
+              onClick={() => setActiveTab('doctors')}
+              className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-3 ${
+                activeTab === 'doctors'
+                  ? 'bg-blue-50 text-blue-600 font-medium'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Médecins
+            </button>
           </nav>
         </div>
 
         <div className="mt-auto pt-6 border-t border-gray-200 flex flex-col gap-3">
           <button
             onClick={logout}
-            className="text-left px-4 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="text-left px-4 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2"
           >
+            <LogOut className="w-4 h-4" />
             Logout
           </button>
           <div className="px-4 py-3 bg-gray-50 rounded-lg">
@@ -91,12 +156,11 @@ export default function PatientPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
               <p className="text-sm text-gray-500 mt-1">
-                {activeTab === 'appointments' ? 'Manage your appointments and availability' : 'Find and book appointments'}
+                {activeTab === 'appointments'
+                  ? 'Gérez vos rendez-vous et rejoignez vos consultations'
+                  : 'Trouvez et réservez un rendez-vous'}
               </p>
             </div>
-            <button className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors">
-              🔔
-            </button>
           </div>
 
           {/* Tabs */}
@@ -110,7 +174,7 @@ export default function PatientPage() {
                     : 'border-transparent text-gray-600 hover:text-gray-900'
                 }`}
               >
-                My Appointments ({activeReservations.length})
+                Mes Rendez-vous ({activeReservations.length})
               </button>
               <button
                 onClick={() => setActiveTab('doctors')}
@@ -120,7 +184,7 @@ export default function PatientPage() {
                     : 'border-transparent text-gray-600 hover:text-gray-900'
                 }`}
               >
-                Available Doctors
+                Médecins disponibles
               </button>
             </div>
           </div>
@@ -128,62 +192,105 @@ export default function PatientPage() {
 
         {/* Content */}
         <main className="p-8">
-          {/* Appointments Tab */}
+          {/* ═══ APPOINTMENTS TAB ═══ */}
           {activeTab === 'appointments' && (
             <div>
               {loading ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500">Loading appointments...</p>
+                  <div className="text-4xl mb-3 animate-pulse">🏥</div>
+                  <p className="text-gray-500">Chargement...</p>
                 </div>
               ) : activeReservations.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
                   <p className="text-5xl mb-4">📋</p>
-                  <p className="text-gray-500 mb-6">No active appointments yet</p>
+                  <p className="text-gray-500 mb-6">Aucun rendez-vous actif</p>
                   <button
                     onClick={() => setActiveTab('doctors')}
                     className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium"
                   >
-                    Browse Doctors
+                    Chercher un médecin
                   </button>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {activeReservations.map((r) => (
-                    <div key={r.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                              Active
-                            </span>
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                              Online
-                            </span>
+                  {activeReservations.map((r) => {
+                    const { canJoin, label } = canJoinMeeting(r);
+                    const day = r.schedule?.dayOfWeek || r.reservationDay;
+                    const startTime = r.schedule?.startTime || r.reservationTime;
+                    const endTime = r.schedule?.endTime || '';
+                    const isOnline = r.schedule?.appointmenttype === TYPE.ONLINE || !!r.meetingUrl;
+
+                    return (
+                      <div
+                        key={r.id}
+                        className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                                Active
+                              </span>
+                              {isOnline && (
+                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full flex items-center gap-1">
+                                  <Video className="w-3 h-3" /> En ligne
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-gray-900 font-semibold text-lg">{r.reason || 'Consultation'}</p>
+                            <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                {dayLabels[day] || day}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-4 h-4" />
+                                {startTime}{endTime ? ` - ${endTime}` : ''}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              Médecin: {r.doctorId.slice(0, 8)}...
+                            </p>
                           </div>
-                          <p className="text-gray-900 font-semibold">{r.reason}</p>
-                          <p className="text-sm text-gray-500 mt-2">
-                            {r.schedule?.dayOfWeek} • {r.schedule?.startTime} - {r.schedule?.endTime}
-                          </p>
+
+                          {/* Join Button */}
+                          <div className="ml-4 flex-shrink-0">
+                            {r.meetingUrl ? (
+                              canJoin ? (
+                                <a
+                                  href={r.meetingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors shadow-sm"
+                                >
+                                  <Video className="w-4 h-4" />
+                                  Rejoindre
+                                </a>
+                              ) : (
+                                <button
+                                  disabled
+                                  className="inline-flex items-center gap-2 bg-gray-100 text-gray-400 px-5 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed"
+                                  title="La consultation n'a pas encore commencé"
+                                >
+                                  <Clock className="w-4 h-4" />
+                                  {label}
+                                </button>
+                              )
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">Pas de meeting</span>
+                            )}
+                          </div>
                         </div>
-                        {r.meetingUrl && (
-                          <a
-                            href={r.meetingUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-                          >
-                            Join Meeting
-                          </a>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
 
-          {/* Doctors Tab */}
+          {/* ═══ DOCTORS TAB ═══ */}
           {activeTab === 'doctors' && (
             <div>
               <div className="mb-6 flex gap-4">
@@ -191,19 +298,12 @@ export default function PatientPage() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Search doctors by name"
+                    placeholder="Rechercher un médecin..."
                     value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setCurrentPage(1);
-                    }}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                <button className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm">
-                  Filter
-                  <ChevronDown className="w-4 h-4" />
-                </button>
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -211,14 +311,13 @@ export default function PatientPage() {
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Doctor</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Specialty</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Appointment Type</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Action</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Médecin</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Spécialité</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900">Type</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {paginatedDoctors.map((doctor) => (
+                      {filteredDoctors.map((doctor) => (
                         <tr key={doctor.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
@@ -234,50 +333,17 @@ export default function PatientPage() {
                           <td className="px-6 py-4">
                             <div className="flex gap-2">
                               <span className="inline-flex items-center gap-1 text-sm text-gray-600">
-                                🏥 In-person
+                                🏥 Présentiel
                               </span>
                               <span className="inline-flex items-center gap-1 text-sm text-gray-600">
-                                📹 Video
+                                📹 Vidéo
                               </span>
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <button
-                              onClick={() => setActiveTab('appointments')}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-blue-50 text-blue-600 transition-colors"
-                              title="Add Appointment"
-                            >
-                              <Plus className="w-5 h-5" />
-                            </button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
-
-                {/* Pagination */}
-                <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between text-sm">
-                  <button className="text-gray-600 hover:text-gray-900">← Previous</button>
-                  <div className="flex gap-1">
-                    {Array.from({ length: totalPages }).map((_, i) => (
-                      <button
-                        key={i + 1}
-                        onClick={() => setCurrentPage(i + 1)}
-                        className={`w-8 h-8 rounded-lg transition-colors ${
-                          currentPage === i + 1
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
-                  </div>
-                  <button className="text-gray-600 hover:text-gray-900">Next →</button>
-                  <span className="text-gray-500 ml-auto">
-                    Page {currentPage} of {totalPages}
-                  </span>
                 </div>
               </div>
             </div>

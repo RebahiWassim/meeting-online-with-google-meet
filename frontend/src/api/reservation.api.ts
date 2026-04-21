@@ -1,6 +1,7 @@
 // ── Reservation Service API ──────────────────────────────────────────────────
-// Wraps all calls to the reservation_service (default port 3002)
+// Wraps all calls to the reservation_service
 // Uses authFetch for automatic JWT refresh on 401.
+// In production, requests go through Vercel proxy (relative URLs).
 
 import { authFetch } from '../auth/tokenManager';
 import {
@@ -10,12 +11,12 @@ import {
   CreateSchedulePayload,
 } from '../types/reservation.types';
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+const BASE = import.meta.env.VITE_API_URL || '';
 
 // ─── Reservations ─────────────────────────────────────────────────────────────
 
 export const reservationApi = {
-  /** Patient books a slot */
+  /** Patient books a slot — backend auto-creates Daily.co room */
   create: async (payload: CreateReservationPayload): Promise<Reservation> => {
     const res = await authFetch(`${BASE}/reservation/create`, {
       method: 'POST',
@@ -42,12 +43,19 @@ export const reservationApi = {
     return res.json();
   },
 
-  /** Cancel a reservation */
+  /** Cancel a reservation (also deletes Daily.co room) */
   cancel: async (reservationId: string): Promise<{ message: string }> => {
     const res = await authFetch(`${BASE}/reservation/cancel/${reservationId}`, {
       method: 'POST',
     });
     if (!res.ok) throw new Error('Erreur annulation de la réservation');
+    return res.json();
+  },
+
+  /** Get a specific reservation with meeting details */
+  getById: async (reservationId: string): Promise<Reservation> => {
+    const res = await authFetch(`${BASE}/reservation/${reservationId}`);
+    if (!res.ok) throw new Error('Erreur récupération de la réservation');
     return res.json();
   },
 };

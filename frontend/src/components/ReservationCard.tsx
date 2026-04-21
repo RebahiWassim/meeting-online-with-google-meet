@@ -114,9 +114,9 @@ export default function ReservationCard({
           </button>
         )}
 
-        {reservation.meetLink && schedule.appointmenttype === TYPE.ONLINE && reservationStatus && (
+        {reservation.meetingUrl && schedule.appointmenttype === TYPE.ONLINE && reservationStatus && (
           <a
-            href={reservation.meetLink}
+            href={reservation.meetingUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-700 flex items-center gap-1"

@@ -34,9 +34,11 @@ export interface Reservation {
   doctorId: string;
   reason: string;
   reservationStatus: boolean;
+  reservationDay: string;
+  reservationTime: string;
   schedule: Schedule;
-  meetLink?: string;
   meetingUrl?: string;
+  meetingRoomName?: string;
 }
 
 // ── Auth payloads ─────────────────────────────────────────────────────────────

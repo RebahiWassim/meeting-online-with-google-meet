@@ -4,6 +4,10 @@
       "source": "/auth/:path*",
       "destination": "https://authservice-version-90.onrender.com/auth/:path*"
     },
+    {
+      "source": "/reservation/:path*",
+      "destination": "https://reservation-service-f8ik.onrender.com/reservation/:path*"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "buildCommand": "npm run build",
