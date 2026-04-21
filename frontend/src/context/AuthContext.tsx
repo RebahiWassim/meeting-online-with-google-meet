@@ -9,7 +9,7 @@ import {
 import { TokenStorage, authFetch } from '../auth/tokenManager';
 import { UserProfile } from '../types/reservation.types';
 
-const AUTH_URL = import.meta.env.VITE_AUTHSERV_URL || 'http://localhost:3000';
+const AUTH_URL = import.meta.env.VITE_AUTHSERV_URL || '';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 
