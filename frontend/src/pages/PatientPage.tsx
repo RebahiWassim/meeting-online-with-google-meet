@@ -1,8 +1,9 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useMeetings } from '../hooks/useMeetings';
 import { Reservation, TYPE } from '../types/reservation.types';
 import { Video, Clock, Calendar, Search, ChevronDown, LogOut, Users, Plus, Loader } from 'lucide-react';
-import DoctorDetailsModal from '../components/DoctorDetailsModal';
+import DoctorDetailsModal from '../components/DoctorDetailsModel';
 import { reservationApi, doctorApi, Doctor } from '../api/reservation.api';
 
 // ── Helper: check if "Join" button should be enabled ────────────────────────
@@ -61,13 +62,6 @@ const dayLabels: Record<string, string> = {
   MONDAY: 'Lundi', TUESDAY: 'Mardi', WEDNESDAY: 'Mercredi',
   THURSDAY: 'Jeudi', FRIDAY: 'Vendredi', SATURDAY: 'Samedi', SUNDAY: 'Dimanche',
 };
-
-interface Doctor {
-  id: string;
-  name: string;
-  specialty: string;
-  avatar: string;
-}
 
 export default function PatientPage() {
   const { user, logout } = useAuth();

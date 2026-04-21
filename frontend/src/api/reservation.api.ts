@@ -141,17 +141,27 @@ export const scheduleApi = {
   },
 };
 
+// ─── Doctor type ──────────────────────────────────────────────────────────────
+export interface Doctor {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  specialty?: string;
+  role?: string;
+}
+
 // ─── Doctors ──────────────────────────────────────────────────────────────────
 export const doctorApi = {
   /** Get all available doctors */
-  getAll: async () => {
+  getAll: async (): Promise<Doctor[]> => {
     const res = await authFetch(`${BASE}/user/doctors`);
     if (!res.ok)
       throw new Error('Erreur récupération des médecins');
     return res.json();
   },
   /** Get a specific doctor by ID */
-  getById: async (doctorId) => {
+  getById: async (doctorId: string): Promise<Doctor> => {
     const res = await authFetch(`${BASE}/user/doctor/${doctorId}`);
     if (!res.ok)
       throw new Error('Erreur récupération du médecin');
